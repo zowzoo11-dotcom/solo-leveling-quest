@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>DAILY QUEST // HUNTER SYSTEM</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#03060c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hunter Quest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#03060c;
+    --panel:#081120;
+    --panel-2:#0b1830;
+    --line:#1c3a5e;
+    --cyan:#4fe0ff;
+    --cyan-dim:#2a8bb8;
+    --violet:#8b6bff;
+    --danger:#ff3350;
+    --text:#dcecff;
+    --text-dim:#5f7fa3;
+    --gold:#ffd76b;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(79,224,255,0.10), transparent 60%),
+      radial-gradient(ellipse at 90% 110%, rgba(139,107,255,0.08), transparent 55%),
+      var(--void);
+    color:var(--text);
+    font-family:'Rajdhani', sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+    position:relative;
+  }
+  /* ambient scanline grid */
+  body::before{
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(79,224,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,224,255,0.035) 1px, transparent 1px);
+    background-size:42px 42px;
+    pointer-events:none;
+    z-index:0;
+    mask-image:radial-gradient(ellipse at 50% 20%, black, transparent 75%);
+  }
+  .noise-line{
+    position:fixed; left:0; right:0; height:1px;
+    background:linear-gradient(90deg, transparent, rgba(79,224,255,0.5), transparent);
+    animation:scan 6s linear infinite;
+    z-index:0; pointer-events:none;
+  }
+  @keyframes scan{ 0%{top:-2%;} 100%{top:102%;} }
+
+  .clip{ clip-path:polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px); }
+
+  /* ---------- INTRO OVERLAY ---------- */
+  #intro{
+    position:fixed; inset:0; z-index:100;
+    background:var(--void);
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:18px;
+    animation:introOut .8s ease 2.6s forwards;
+  }
+  #intro .tag{
+    font-family:'Share Tech Mono', monospace;
+    letter-spacing:.5em; font-size:.75rem; color:var(--cyan-dim);
+    animation:fadeUp .6s ease both;
+  }
+  #intro h1{
+    font-family:'Orbitron', sans-serif; font-weight:900;
+    font-size:clamp(1.8rem, 6vw, 3.4rem);
+    color:var(--cyan);
+    text-shadow:0 0 18px rgba(79,224,255,0.65), 0 0 46px rgba(79,224,255,0.25);
+    letter-spacing:.12em;
+    animation:fadeUp .7s ease .25s both;
+  }
+  #intro p{
+    font-size:1rem; color:var(--text-dim); letter-spacing:.08em;
+    animation:fadeUp .7s ease .5s both;
+  }
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  @keyframes introOut{ to{opacity:0; visibility:hidden; pointer-events:none;} }
+
+  /* ---------- LAYOUT ---------- */
+  .wrap{ max-width:1100px; margin:0 auto; padding:clamp(16px,4vw,36px) clamp(12px,3vw,20px) 60px; position:relative; z-index:1; width:100%; }
+
+  .hud{
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    border:1px solid var(--line);
+    padding:16px clamp(14px,3vw,24px);
+    margin-bottom:18px;
+  }
+  .hud-id{ display:flex; align-items:center; gap:12px; min-width:0; }
+  .rank-badge{
+    width:48px; height:48px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+    font-family:'Orbitron'; font-weight:900; font-size:1.05rem; color:var(--void);
+    background:linear-gradient(135deg, var(--cyan), var(--violet));
+    clip-path:polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+    transition:background .4s ease;
+  }
+  .hud-id .name{ font-family:'Orbitron'; font-size:.92rem; letter-spacing:.05em; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hud-id .sub{ font-family:'Share Tech Mono'; font-size:.68rem; color:var(--text-dim); letter-spacing:.08em; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .lvl-block{ text-align:right; flex:1 1 180px; max-width:220px; }
+  .lvl-block .lv{ font-family:'Orbitron'; font-size:1.4rem; color:var(--cyan); letter-spacing:.05em; }
+  .lvl-block .lv span{ color:var(--gold); }
+  .expbar{ width:100%; max-width:220px; margin-left:auto; height:8px; background:#050a14; border:1px solid var(--line); margin-top:6px; position:relative; overflow:hidden; }
+  .expbar i{ display:block; height:100%; width:0%; background:linear-gradient(90deg, var(--cyan-dim), var(--cyan)); box-shadow:0 0 10px var(--cyan); transition:width .5s ease; }
+  .exp-label{ font-family:'Share Tech Mono'; font-size:.6rem; color:var(--text-dim); margin-top:4px; letter-spacing:.06em;}
+  .cal-btn{
+    margin-top:8px; font-family:'Share Tech Mono'; font-size:.62rem; letter-spacing:.08em;
+    color:var(--cyan); background:transparent; border:1px solid var(--cyan-dim);
+    padding:6px 10px; cursor:pointer; clip-path:polygon(6px 0,100% 0,100% 100%,0 100%,0 6px);
+    transition:.2s;
+  }
+  .cal-btn:hover{ background:rgba(79,224,255,.1); box-shadow:0 0 10px rgba(79,224,255,.3); }
+  .hud-btns{ display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
+  .hud-btns .cal-btn{ margin-top:0; }
+  .install-btn{ color:var(--void); background:linear-gradient(90deg, var(--gold), var(--cyan)); border-color:transparent; font-weight:700; }
+  .install-btn:hover{ filter:brightness(1.1); box-shadow:0 0 12px rgba(255,215,107,.4); }
+  @media (max-width:480px){ .hud-btns{ justify-content:flex-start; } }
+
+  .grid{ display:grid; grid-template-columns:1fr 300px; gap:18px; align-items:start; }
+  @media (max-width:820px){ .grid{ grid-template-columns:1fr; } }
+
+  .panel{
+    background:linear-gradient(180deg, rgba(11,24,48,0.7), rgba(8,17,32,0.85));
+    border:1px solid var(--line);
+    padding:clamp(14px,4vw,22px) clamp(14px,4vw,22px) 24px;
+    position:relative;
+    min-width:0;
+  }
+  @media (max-width:480px){
+    .lvl-block{ text-align:left; flex:1 1 100%; max-width:none; }
+    .expbar{ margin-left:0; max-width:none; }
+    .hud-id .name{ font-size:.82rem; }
+    .day-tab{ font-size:.65rem; padding:7px 9px; }
+    .instance-name{ font-size:1.02rem; }
+  }
+  .panel-title{
+    font-family:'Orbitron'; font-size:.85rem; letter-spacing:.18em; color:var(--cyan);
+    display:flex; align-items:center; gap:10px; margin-bottom:16px;
+  }
+  .panel-title::before{ content:''; width:8px; height:8px; background:var(--cyan); box-shadow:0 0 8px var(--cyan); }
+
+  .day-tabs{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+  .day-tab{
+    font-family:'Share Tech Mono'; font-size:.72rem; letter-spacing:.05em;
+    color:var(--text-dim); background:#060d1a; border:1px solid var(--line);
+    padding:8px 12px; cursor:pointer; transition:.2s; clip-path:polygon(8px 0,100% 0,100% 100%,0 100%,0 8px);
+  }
+  .day-tab.active{ color:var(--void); background:var(--cyan); border-color:var(--cyan); box-shadow:0 0 14px rgba(79,224,255,.5); }
+  .day-tab.done::after{ content:' ✓'; color:var(--gold); }
+  .day-tab.active.done::after{ color:var(--void); }
+
+  .instance-name{ font-family:'Orbitron'; font-size:1.2rem; color:var(--text); margin-bottom:2px; }
+  .instance-rank{ font-family:'Share Tech Mono'; font-size:.7rem; color:var(--violet); letter-spacing:.15em; margin-bottom:18px; }
+
+  .quest-item{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:12px 4px; border-bottom:1px dashed rgba(79,224,255,0.15);
+  }
+  .quest-item:last-child{ border-bottom:none; }
+  .box{
+    width:24px; height:24px; flex:0 0 auto; border:1px solid var(--cyan-dim);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    clip-path:polygon(5px 0,100% 0,100% 100%,0 100%,0 5px); transition:.15s;
+  }
+  .box.checked{ background:var(--cyan); box-shadow:0 0 10px rgba(79,224,255,.6); }
+  .box.checked::after{ content:'✓'; color:var(--void); font-weight:700; font-size:.9rem; }
+  .q-text{ flex:1 1 140px; min-width:0; }
+  .q-name{ font-size:1.02rem; color:var(--text); }
+  .q-name.checked{ color:var(--text-dim); text-decoration:line-through; }
+  .q-reps{ font-family:'Share Tech Mono'; font-size:.72rem; color:var(--cyan-dim); letter-spacing:.05em; flex:0 0 auto; margin-left:auto; }
+
+  .complete-btn{
+    margin-top:20px; width:100%; padding:13px; text-align:center; cursor:pointer;
+    font-family:'Orbitron'; font-size:.85rem; letter-spacing:.1em; color:var(--void);
+    background:linear-gradient(90deg, var(--cyan-dim), var(--cyan));
+    border:none; clip-path:polygon(10px 0,100% 0,100% 100%,0 100%,0 10px);
+    transition:.2s; opacity:.4; pointer-events:none;
+  }
+  .complete-btn.ready{ opacity:1; pointer-events:auto; box-shadow:0 0 18px rgba(79,224,255,.5); }
+  .complete-btn.ready:hover{ filter:brightness(1.15); }
+
+  /* stats side panel */
+  .stat-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-family:'Share Tech Mono'; font-size:.78rem; }
+  .stat-row .k{ color:var(--text-dim); letter-spacing:.1em; }
+  .stat-row .v{ color:var(--cyan); font-size:.95rem; }
+  .stat-bar{ height:5px; background:#050a14; border:1px solid var(--line); margin:5px 0 14px; }
+  .stat-bar i{ display:block; height:100%; background:linear-gradient(90deg, var(--violet), var(--cyan)); }
+
+  .streak-box{ margin-top:18px; padding-top:16px; border-top:1px solid var(--line); text-align:center; }
+  .streak-box .num{ font-family:'Orbitron'; font-size:2rem; color:var(--gold); text-shadow:0 0 14px rgba(255,215,107,.5); }
+  .streak-box .lbl{ font-family:'Share Tech Mono'; font-size:.68rem; color:var(--text-dim); letter-spacing:.1em; margin-top:2px; }
+
+  footer{ text-align:center; margin-top:26px; font-family:'Share Tech Mono'; font-size:.65rem; color:var(--text-dim); letter-spacing:.1em; }
+
+  /* ---------- LEVEL UP OVERLAY ---------- */
+  #levelup{
+    position:fixed; inset:0; z-index:200; display:none;
+    align-items:center; justify-content:center; flex-direction:column;
+    background:radial-gradient(ellipse at 50% 50%, rgba(20,40,70,0.92), rgba(2,5,10,0.97));
+    backdrop-filter:blur(2px);
+  }
+  #levelup.show{ display:flex; animation:flash .5s ease; }
+  @keyframes flash{ 0%{ background:rgba(79,224,255,0.9);} 100%{ background:transparent; } }
+  .lu-ring{
+    position:absolute; width:60px; height:60px; border:2px solid var(--cyan);
+    border-radius:50%; opacity:0;
+    animation:ring 1.4s ease-out .15s forwards;
+  }
+  @keyframes ring{ 0%{ width:60px; height:60px; opacity:1;} 100%{ width:640px; height:640px; opacity:0; } }
+  .lu-title{
+    font-family:'Orbitron'; font-weight:900; letter-spacing:.15em;
+    font-size:clamp(2.4rem,9vw,5rem); color:#fff;
+    text-shadow:0 0 20px var(--cyan), 0 0 60px var(--cyan), 0 0 100px rgba(139,107,255,.6);
+    opacity:0; transform:scale(.5);
+    animation:pop .6s cubic-bezier(.2,1.4,.4,1) .2s forwards;
+  }
+  @keyframes pop{ to{ opacity:1; transform:scale(1); } }
+  .lu-sub{ font-family:'Share Tech Mono'; color:var(--cyan); letter-spacing:.3em; font-size:.85rem; margin-top:10px; opacity:0; animation:fadeUp .6s ease .7s forwards; }
+  .lu-stats{ margin-top:28px; display:flex; gap:26px; flex-wrap:wrap; justify-content:center; padding:0 20px; opacity:0; animation:fadeUp .6s ease .95s forwards; }
+  .lu-stats div{ text-align:center; font-family:'Share Tech Mono'; font-size:.7rem; color:var(--text-dim); letter-spacing:.1em; }
+  .lu-stats div b{ display:block; font-family:'Orbitron'; color:var(--gold); font-size:1.1rem; }
+  .lu-close{ margin-top:34px; opacity:0; animation:fadeUp .6s ease 1.2s forwards; font-family:'Orbitron'; font-size:.75rem; letter-spacing:.15em; color:var(--void); background:var(--cyan); border:none; padding:11px 26px; cursor:pointer; clip-path:polygon(8px 0,100% 0,100% 100%,0 100%,0 8px); }
+
+  /* ---------- ACHIEVEMENTS ---------- */
+  .ach-panel{ margin-top:18px; }
+  .ach-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:10px; }
+  .ach-card{ border:1px solid var(--line); background:#060d1a; padding:12px 10px; text-align:center; transition:.25s; clip-path:polygon(8px 0,100% 0,100% 100%,0 100%,0 8px); }
+  .ach-card .ic{ font-size:1.4rem; margin-bottom:6px; }
+  .ach-card .nm{ font-family:'Orbitron'; font-size:.66rem; letter-spacing:.03em; color:var(--text-dim); }
+  .ach-card .ds{ font-family:'Share Tech Mono'; font-size:.58rem; color:var(--text-dim); margin-top:4px; opacity:.75; }
+  .ach-card.unlocked{ border-color:var(--gold); background:linear-gradient(160deg, rgba(255,215,107,0.08), #060d1a); box-shadow:0 0 14px rgba(255,215,107,.15); }
+  .ach-card.unlocked .nm{ color:var(--gold); }
+  .ach-card.locked{ opacity:.45; }
+
+  /* ---------- TOASTS ---------- */
+  #toastWrap{ position:fixed; top:14px; right:14px; z-index:300; display:flex; flex-direction:column; gap:10px; max-width:min(320px, 88vw); }
+  .toast{ border:1px solid var(--gold); background:linear-gradient(160deg, rgba(10,16,28,0.96), rgba(8,13,24,0.98)); padding:12px 16px; clip-path:polygon(10px 0,100% 0,100% 100%,0 100%,0 10px); animation:toastIn .35s ease, toastOut .4s ease 3.8s forwards; box-shadow:0 0 18px rgba(255,215,107,.25); }
+  .toast .t1{ font-family:'Share Tech Mono'; font-size:.58rem; letter-spacing:.15em; color:var(--gold); }
+  .toast .t2{ font-family:'Orbitron'; font-size:.82rem; color:var(--text); margin-top:4px; }
+  .toast .t3{ font-family:'Share Tech Mono'; font-size:.62rem; color:var(--text-dim); margin-top:2px; }
+  @keyframes toastIn{ from{ opacity:0; transform:translateX(30px);} to{ opacity:1; transform:translateX(0);} }
+  @keyframes toastOut{ to{ opacity:0; transform:translateX(30px); } }
+
+  /* ---------- AWAKENING CUTSCENE ---------- */
+  #awakening{
+    --awk-glow:#4fe0ff; --awk-accent:#4fe0ff; --awk-bg1:#0b2a3d;
+    position:fixed; inset:0; z-index:250; display:none;
+    align-items:center; justify-content:center; flex-direction:column; overflow:hidden;
+    background:radial-gradient(ellipse at 50% 55%, var(--awk-bg1), #020308 75%);
+    text-align:center; padding:20px;
+  }
+  #awakening.show{ display:flex; animation:awkShake 3.2s ease; }
+  @keyframes awkShake{ 0%,100%{ transform:translate(0,0);} 4%{transform:translate(-4px,2px);} 8%{transform:translate(4px,-2px);} 12%{transform:translate(-2px,3px);} 16%{transform:translate(2px,-3px);} 20%{transform:translate(0,0);} }
+  #awkParticles{ position:absolute; inset:0; pointer-events:none; }
+  .awk-particle{
+    position:absolute; bottom:-10px; width:3px; height:3px; border-radius:50%;
+    background:var(--awk-accent); box-shadow:0 0 6px var(--awk-accent);
+    animation:awkFloat var(--dur,3s) ease-in forwards;
+  }
+  @keyframes awkFloat{ 0%{ transform:translateY(0); opacity:0;} 15%{opacity:1;} 100%{ transform:translateY(-70vh); opacity:0;} }
+  .awk-silhouette{
+    width:110px; height:160px; position:relative; margin-bottom:6px;
+    background:radial-gradient(ellipse at 50% 30%, var(--awk-glow), transparent 70%);
+    opacity:0; animation:awkGlowIn 1s ease .1s forwards;
+    clip-path:polygon(50% 0%, 65% 15%, 60% 45%, 78% 55%, 72% 100%, 28% 100%, 22% 55%, 40% 45%, 35% 15%);
+    filter:blur(1px);
+  }
+  @keyframes awkGlowIn{ from{opacity:0; transform:scale(.8);} to{opacity:.9; transform:scale(1);} }
+  .awk-text1{ font-family:'Share Tech Mono'; letter-spacing:.5em; font-size:.75rem; color:var(--awk-accent); opacity:0; animation:fadeUp .6s ease .3s forwards; }
+  .awk-rank-letter{
+    font-family:'Orbitron'; font-weight:900; font-size:clamp(3rem,14vw,7rem); color:#fff; line-height:1;
+    text-shadow:0 0 24px var(--awk-glow), 0 0 70px var(--awk-glow), 0 0 120px var(--awk-accent);
+    opacity:0; transform:scale(.4); animation:pop .7s cubic-bezier(.2,1.4,.4,1) .5s forwards;
+  }
+  .awk-title{ font-family:'Orbitron'; letter-spacing:.1em; font-size:clamp(.95rem,3vw,1.35rem); color:var(--awk-accent); margin-top:8px; opacity:0; animation:fadeUp .6s ease 1s forwards; }
+  .awk-continue{ margin-top:34px; opacity:0; animation:fadeUp .6s ease 1.4s forwards; font-family:'Orbitron'; font-size:.75rem; letter-spacing:.15em; color:var(--void); background:var(--awk-accent); border:none; padding:11px 28px; cursor:pointer; clip-path:polygon(8px 0,100% 0,100% 100%,0 100%,0 8px); position:relative; z-index:2; }
+
+  /* ---------- CALENDAR MODAL ---------- */
+  #calendarModal{
+    position:fixed; inset:0; z-index:260; display:none;
+    align-items:center; justify-content:center; padding:20px;
+    background:rgba(2,5,10,0.85); backdrop-filter:blur(3px);
+  }
+  #calendarModal.show{ display:flex; }
+  .cal-card{
+    width:100%; max-width:380px;
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    border:1px solid var(--line); padding:20px;
+  }
+  .cal-head{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:12px; }
+  .cal-total{ font-family:'Share Tech Mono'; font-size:.7rem; color:var(--gold); letter-spacing:.08em; }
+  .cal-close{ background:none; border:1px solid var(--line); color:var(--text-dim); width:28px; height:28px; cursor:pointer; font-size:.8rem; }
+  .cal-nav{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .cal-nav button{ background:#060d1a; border:1px solid var(--line); color:var(--cyan); width:32px; height:32px; cursor:pointer; font-size:.8rem; }
+  .cal-month{ font-family:'Orbitron'; font-size:.9rem; letter-spacing:.05em; color:var(--text); }
+  .cal-dow{ display:grid; grid-template-columns:repeat(7,1fr); text-align:center; margin-bottom:6px; }
+  .cal-dow span{ font-family:'Share Tech Mono'; font-size:.58rem; color:var(--text-dim); letter-spacing:.05em; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .cal-day{
+    aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    font-family:'Share Tech Mono'; font-size:.68rem; color:var(--text-dim);
+    border:1px solid rgba(28,58,94,.5); position:relative;
+  }
+  .cal-day.empty{ border:none; }
+  .cal-day.today{ border-color:var(--cyan); color:var(--cyan); }
+  .cal-day.trained{ background:linear-gradient(160deg, rgba(255,215,107,.18), rgba(79,224,255,.1)); border-color:var(--gold); color:var(--gold); font-weight:700; box-shadow:0 0 8px rgba(255,215,107,.25); }
+
+  #growthModal{
+    position:fixed; inset:0; z-index:260; display:none;
+    align-items:center; justify-content:center; padding:20px;
+    background:rgba(2,5,10,0.85); backdrop-filter:blur(3px);
+  }
+  #growthModal.show{ display:flex; }
+  #growthSvg{ width:100%; height:170px; display:block; margin-top:6px; }
+  .growth-legend{ margin-top:10px; font-family:'Share Tech Mono'; font-size:.62rem; color:var(--text-dim); letter-spacing:.05em; }
+  .growth-legend i{ display:inline-block; width:10px; height:10px; margin-right:6px; vertical-align:middle; }
+  .growth-empty{ font-family:'Share Tech Mono'; font-size:.7rem; color:var(--text-dim); text-align:center; padding:30px 10px; }
+
+  #iosInstallModal{
+    position:fixed; inset:0; z-index:260; display:none;
+    align-items:center; justify-content:center; padding:20px;
+    background:rgba(2,5,10,0.85); backdrop-filter:blur(3px);
+  }
+  #iosInstallModal.show{ display:flex; }
+  .ios-steps{ margin-top:8px; display:flex; flex-direction:column; gap:12px; }
+  .ios-step{ font-family:'Rajdhani'; font-size:.92rem; color:var(--text); display:flex; gap:10px; align-items:flex-start; }
+  .ios-step b{ color:var(--cyan); }
+  .ios-num{ flex:0 0 auto; width:22px; height:22px; border:1px solid var(--cyan); color:var(--cyan); font-family:'Share Tech Mono'; font-size:.7rem; display:flex; align-items:center; justify-content:center; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="noise-line"></div>
+<div id="toastWrap"></div>
+
+<div id="intro">
+  <div class="tag">S Y S T E M &nbsp; A L E R T</div>
+  <h1>ระบบได้ตรวจพบผู้เล่นใหม่</h1>
+  <p>กำลังเปิดหน้าต่างภารกิจประจำวัน...</p>
+</div>
+
+<div class="wrap">
+
+  <div class="hud">
+    <div class="hud-id">
+      <div class="rank-badge" id="rankBadge">E</div>
+      <div>
+        <div class="name">HUNTER // Rujji</div>
+        <div class="sub" id="rankTitle">STATUS: ACTIVE &nbsp;·&nbsp; TITLE: AWAKENED</div>
+      </div>
+    </div>
+    <div class="lvl-block">
+      <div class="lv">LV. <span id="lvNum">1</span></div>
+      <div class="expbar"><i id="expFill"></i></div>
+      <div class="exp-label"><span id="expText">0 / 100 EXP</span></div>
+      <div class="hud-btns">
+        <button id="installBtn" class="cal-btn install-btn" style="display:none;">⬇ INSTALL APP</button>
+        <button id="calBtn" class="cal-btn">CALENDAR</button>
+        <button id="growthBtn" class="cal-btn">GROWTH</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel clip">
+      <div class="panel-title">DAILY QUEST</div>
+      <div class="day-tabs" id="dayTabs"></div>
+      <div class="instance-name" id="instName"></div>
+      <div class="instance-rank" id="instRank"></div>
+      <div id="questList"></div>
+      <button class="complete-btn" id="completeBtn">COMPLETE QUEST</button>
+    </div>
+
+    <div class="panel clip">
+      <div class="panel-title">STATUS</div>
+      <div class="stat-row"><span class="k">STR</span><span class="v" id="s-str">10</span></div>
+      <div class="stat-bar"><i id="b-str" style="width:20%"></i></div>
+      <div class="stat-row"><span class="k">VIT</span><span class="v" id="s-vit">10</span></div>
+      <div class="stat-bar"><i id="b-vit" style="width:20%"></i></div>
+      <div class="stat-row"><span class="k">AGI</span><span class="v" id="s-agi">10</span></div>
+      <div class="stat-bar"><i id="b-agi" style="width:20%"></i></div>
+      <div class="stat-row"><span class="k">END</span><span class="v" id="s-end">10</span></div>
+      <div class="stat-bar"><i id="b-end" style="width:20%"></i></div>
+
+      <div class="streak-box">
+        <div class="num" id="streakNum">0</div>
+        <div class="lbl">CONSECUTIVE DAYS CLEARED</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel clip ach-panel">
+    <div class="panel-title">ACHIEVEMENTS</div>
+    <div class="ach-grid" id="achGrid"></div>
+  </div>
+
+  <footer>ARISE. &nbsp;THE WEAK ONE FROM YESTERDAY IS NOT THE ONE FROM TODAY.</footer>
+</div>
+
+<div id="levelup">
+  <div class="lu-ring"></div>
+  <div class="lu-title">LEVEL UP</div>
+  <div class="lu-sub">QUEST CLEARED</div>
+  <div class="lu-stats">
+    <div>STR<b>+2</b></div>
+    <div>VIT<b>+2</b></div>
+    <div>AGI<b>+1</b></div>
+    <div>END<b>+1</b></div>
+  </div>
+  <button class="lu-close" id="luClose">CONTINUE</button>
+</div>
+
+<div id="awakening">
+  <div id="awkParticles"></div>
+  <div class="awk-silhouette"></div>
+  <div class="awk-text1">A W A K E N I N G</div>
+  <div class="awk-rank-letter" id="awkLetter">C</div>
+  <div class="awk-title" id="awkTitle">TRAINED HUNTER</div>
+  <button class="awk-continue" id="awkContinue">CONTINUE</button>
+</div>
+
+<div id="calendarModal">
+  <div class="cal-card clip">
+    <div class="cal-head">
+      <div class="cal-title-block">
+        <div class="panel-title" style="margin-bottom:2px;">TRAINING LOG</div>
+        <div class="cal-total" id="calTotal">0 DAYS TRAINED</div>
+      </div>
+      <button class="cal-close" id="calClose">✕</button>
+    </div>
+    <div class="cal-nav">
+      <button id="calPrev">◀</button>
+      <div class="cal-month" id="calMonthLabel">-</div>
+      <button id="calNext">▶</button>
+    </div>
+    <div class="cal-dow">
+      <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+</div>
+
+<div id="growthModal">
+  <div class="cal-card clip">
+    <div class="cal-head">
+      <div class="cal-title-block">
+        <div class="panel-title" style="margin-bottom:2px;">GROWTH CHART</div>
+        <div class="cal-total" id="growthTotal">POWER: 40</div>
+      </div>
+      <button class="cal-close" id="growthClose">✕</button>
+    </div>
+    <svg id="growthSvg" viewBox="0 0 320 170" preserveAspectRatio="none"></svg>
+    <div class="growth-legend">
+      <span><i style="background:var(--cyan)"></i> STR+VIT+AGI+END รวม</span>
+    </div>
+  </div>
+</div>
+
+<div id="iosInstallModal">
+  <div class="cal-card clip">
+    <div class="cal-head">
+      <div class="cal-title-block">
+        <div class="panel-title" style="margin-bottom:2px;">INSTALL APP</div>
+      </div>
+      <button class="cal-close" id="iosInstallClose">✕</button>
+    </div>
+    <div class="ios-steps">
+      <div class="ios-step"><span class="ios-num">1</span> แตะปุ่ม <b>Share</b> (สี่เหลี่ยมมีลูกศรชี้ขึ้น) แถบล่างของ Safari</div>
+      <div class="ios-step"><span class="ios-num">2</span> เลื่อนหาแล้วแตะ <b>Add to Home Screen</b></div>
+      <div class="ios-step"><span class="ios-num">3</span> แตะ <b>Add</b> มุมขวาบน</div>
+      <div class="ios-step"><span class="ios-num">4</span> ไอคอน Hunter Quest จะไปโผล่ที่หน้าโฮมเหมือนแอปจริง</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS = [
+  { key:'mon', label:'MON', name:'E-Rank Instance: Upper Body Trial', rank:'GATE RANK — E', tasks:[
+    ['Push-up','3x12'],['One-arm Dumbbell Row','3x10'],['Shoulder Press','3x12'],['Bicep Curl','3x12'],['Tricep Dips','3x12'],['Plank','20-30s x3'],['Ab Wheel Rollouts','3x8-12'] ]},
+  { key:'tue', label:'TUE', name:'D-Rank Instance: Lower Body Trial', rank:'GATE RANK — D', tasks:[
+    ['Squat','3x15'],['Lunges','3x12'],['Step-up','3x12'],['Glute Bridge','3x15'],['Calf Raise','3x20'] ]},
+  { key:'wed', label:'WED', name:'D-Rank Instance: Endurance Trial', rank:'GATE RANK — D', tasks:[
+    ['Stepper','20-30 mins'],['Russian Twists','3x15'],['Leg Raise','3x12'] ]},
+  { key:'thu', label:'THU', name:'C-Rank Instance: Upper Body Trial II', rank:'GATE RANK — C', tasks:[
+    ['Push-up','3x12'],['One-arm Dumbbell Row','3x10'],['Shoulder Press','3x12'],['Bicep Curl','3x12'],['Tricep Dips','3x12'] ]},
+  { key:'fri', label:'FRI', name:'C-Rank Instance: Lower Body & Core Trial', rank:'GATE RANK — C', tasks:[
+    ['Squat','3x15'],['Lunges','3x12'],['Step-up','3x12'],['Glute Bridge','3x15'],['Calf Raise','3x20'],['Plank','20-30s x3'],['Ab Wheel Rollouts','3x8-12'] ]},
+  { key:'sat', label:'SAT', name:'B-Rank Instance: Cardio Trial', rank:'GATE RANK — B', tasks:[
+    ['Stepper or Run','20-30 mins'] ]},
+  { key:'sun', label:'SUN', name:'Recovery Dungeon', rank:'REST ZONE', tasks:[
+    ['Rest Day','พักผ่อนเต็มที่'] ]},
+];
+
+const RANKS = [
+  { min:1,  letter:'E', title:'AWAKENED HUNTER' },
+  { min:5,  letter:'D', title:'NOVICE HUNTER' },
+  { min:10, letter:'C', title:'TRAINED HUNTER' },
+  { min:15, letter:'B', title:'ELITE HUNTER' },
+  { min:20, letter:'A', title:'NATIONAL LEVEL CANDIDATE' },
+  { min:30, letter:'S', title:'SHADOW MONARCH' },
+];
+function rankFor(level){
+  let r = RANKS[0];
+  for(const cand of RANKS){ if(level >= cand.min) r = cand; }
+  return r;
+}
+
+let state = {
+  level:1, exp:0, expNeeded:100,
+  stats:{str:10,vit:10,agi:10,end:10},
+  streak:0,
+  totalCleared:0,
+  bossCleared:0,
+  unlocked:[],
+  clearedDates:[],
+  history:[],
+  lastClearedDayKey:null,
+  currentDay: DAYS[new Date().getDay()===0?6:new Date().getDay()-1].key,
+  progress:{} // key: dayKey -> array of booleans
+};
+DAYS.forEach(d=> state.progress[d.key] = d.tasks.map(()=>false));
+
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function isClearedToday(){
+  return state.clearedDates.length>0 && state.clearedDates[state.clearedDates.length-1] === todayStr();
+}
+
+const SAVE_KEY = 'soloLevelingQuestSave_v1';
+function saveState(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
+  catch(e){ /* storage unavailable — progress just won't persist this session */ }
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return;
+    const saved = JSON.parse(raw);
+    Object.assign(state, saved);
+    state.stats = Object.assign({str:10,vit:10,agi:10,end:10}, saved.stats||{});
+    state.progress = Object.assign(state.progress, saved.progress||{});
+    if(!Array.isArray(state.clearedDates)) state.clearedDates = [];
+    if(!Array.isArray(state.unlocked)) state.unlocked = [];
+    if(!Array.isArray(state.history)) state.history = [];
+  }catch(e){ /* corrupted or unavailable save — start fresh */ }
+}
+loadState();
+
+const ACHIEVEMENTS = [
+  { id:'first',   icon:'⚔️', name:'ก้าวแรกของฮันเตอร์', desc:'เคลียร์เควสแรกสำเร็จ', check:s=>s.totalCleared>=1 },
+  { id:'streak3', icon:'🔥', name:'จุดไฟติดแล้ว', desc:'ทำต่อเนื่อง 3 วัน', check:s=>s.streak>=3 },
+  { id:'streak7', icon:'🌙', name:'หนึ่งสัปดาห์ไม่มีวันหยุด', desc:'ทำต่อเนื่อง 7 วัน', check:s=>s.streak>=7 },
+  { id:'streak30',icon:'👑', name:'นักล่าผู้ไม่มีวันพัก', desc:'ทำต่อเนื่อง 30 วัน', check:s=>s.streak>=30 },
+  { id:'boss4',   icon:'💀', name:'ผู้พิชิตดันเจี้ยน', desc:'เคลียร์ Boss Raid 4 ครั้ง', check:s=>s.bossCleared>=4 },
+  { id:'total25', icon:'📜', name:'สะสมพลังมาไกล', desc:'เคลียร์เควสสะสม 25 ครั้ง', check:s=>s.totalCleared>=25 },
+  { id:'total100',icon:'🏆', name:'ตำนานที่กำลังก่อร่าง', desc:'เคลียร์เควสสะสม 100 ครั้ง', check:s=>s.totalCleared>=100 },
+  { id:'rankS',   icon:'✨', name:'ผู้ตื่นรู้สูงสุด', desc:'ไปถึงแรงค์ S', check:s=>rankFor(s.level).letter==='S' },
+];
+
+const AWK_THEME = {
+  E:{ bg1:'#0b2a3d', glow:'#4fe0ff', accent:'#4fe0ff', particles:12 },
+  D:{ bg1:'#0b2350', glow:'#4fa3ff', accent:'#4fa3ff', particles:18 },
+  C:{ bg1:'#0c2f4a', glow:'#39e6c8', accent:'#39e6c8', particles:22 },
+  B:{ bg1:'#1c1440', glow:'#8b6bff', accent:'#8b6bff', particles:28 },
+  A:{ bg1:'#2b1030', glow:'#ff6bd8', accent:'#ffd76b', particles:34 },
+  S:{ bg1:'#150a2e', glow:'#ffd76b', accent:'#8b6bff', particles:44 },
+};
+
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx){ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+  return audioCtx;
+}
+function tone(ctx, freq, start, dur, type='sine', gainPeak=0.18){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+  gain.gain.setValueAtTime(0, ctx.currentTime + start);
+  gain.gain.linearRampToValueAtTime(gainPeak, ctx.currentTime + start + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + dur);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(ctx.currentTime + start);
+  osc.stop(ctx.currentTime + start + dur + 0.05);
+}
+function playLevelUpSound(){
+  try{
+    const ctx = getAudioCtx();
+    if(ctx.state === 'suspended') ctx.resume();
+    // low impact thump
+    tone(ctx, 90, 0, 0.35, 'sine', 0.35);
+    // rising sparkle arpeggio
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    notes.forEach((f,i)=> tone(ctx, f, 0.08 + i*0.09, 0.35, 'triangle', 0.16));
+    // shimmer tail
+    tone(ctx, 1568, 0.45, 0.5, 'sine', 0.08);
+  }catch(e){ /* audio unsupported, ignore */ }
+}
+
+function playAwakenSound(rankLetter){
+  try{
+    const ctx = getAudioCtx();
+    if(ctx.state === 'suspended') ctx.resume();
+    const idx = RANKS.findIndex(r=>r.letter===rankLetter);
+    // deep rising rumble
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(45, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(55 + idx*18, ctx.currentTime + 1.2);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + 0.6);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.7);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 1.8);
+    // bell hits — more of them at higher rank
+    const baseNotes = [392, 523.25, 659.25, 783.99, 987.77, 1244.5];
+    const count = 3 + idx;
+    for(let i=0;i<count;i++){
+      tone(ctx, baseNotes[i % baseNotes.length], 0.9 + i*0.12, 0.45, 'triangle', 0.15);
+    }
+  }catch(e){ /* audio unsupported, ignore */ }
+}
+
+function playAchievementSound(){
+  try{
+    const ctx = getAudioCtx();
+    if(ctx.state === 'suspended') ctx.resume();
+    tone(ctx, 880, 0, 0.25, 'square', 0.08);
+    tone(ctx, 1318.5, 0.1, 0.3, 'triangle', 0.12);
+  }catch(e){}
+}
+
+function checkAchievements(){
+  const newly = [];
+  ACHIEVEMENTS.forEach(a=>{
+    if(!state.unlocked.includes(a.id) && a.check(state)){
+      state.unlocked.push(a.id);
+      newly.push(a);
+    }
+  });
+  return newly;
+}
+
+function renderAchievements(){
+  const grid = document.getElementById('achGrid');
+  grid.innerHTML = '';
+  ACHIEVEMENTS.forEach(a=>{
+    const done = state.unlocked.includes(a.id);
+    const card = document.createElement('div');
+    card.className = 'ach-card ' + (done ? 'unlocked':'locked');
+    card.innerHTML = `
+      <div class="ic">${done ? a.icon : '🔒'}</div>
+      <div class="nm">${done ? a.name : '???'}</div>
+      <div class="ds">${done ? a.desc : 'ยังไม่ปลดล็อก'}</div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function showToast(a){
+  const wrap = document.getElementById('toastWrap');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `
+    <div class="t1">🏆 ACHIEVEMENT UNLOCKED</div>
+    <div class="t2">${a.icon} ${a.name}</div>
+    <div class="t3">${a.desc}</div>
+  `;
+  wrap.appendChild(t);
+  playAchievementSound();
+  setTimeout(()=> t.remove(), 4200);
+}
+function queueToasts(list){
+  list.forEach((a,i)=> setTimeout(()=> showToast(a), i*350));
+}
+
+function playAwakening(rankLetter, title, onContinue){
+  const theme = AWK_THEME[rankLetter] || AWK_THEME.E;
+  const el = document.getElementById('awakening');
+  el.style.setProperty('--awk-glow', theme.glow);
+  el.style.setProperty('--awk-accent', theme.accent);
+  el.style.setProperty('--awk-bg1', theme.bg1);
+  document.getElementById('awkLetter').textContent = rankLetter;
+  document.getElementById('awkTitle').textContent = title;
+  const pWrap = document.getElementById('awkParticles');
+  pWrap.innerHTML = '';
+  for(let i=0;i<theme.particles;i++){
+    const p = document.createElement('span');
+    p.className = 'awk-particle';
+    p.style.left = (Math.random()*100)+'%';
+    p.style.animationDelay = (Math.random()*1.4)+'s';
+    p.style.setProperty('--dur', (2+Math.random()*2.2)+'s');
+    pWrap.appendChild(p);
+  }
+  el.classList.add('show');
+  playAwakenSound(rankLetter);
+  document.getElementById('awkContinue').onclick = ()=>{
+    el.classList.remove('show');
+    if(onContinue) onContinue();
+  };
+}
+
+const dayTabsEl = document.getElementById('dayTabs');
+const questListEl = document.getElementById('questList');
+const completeBtn = document.getElementById('completeBtn');
+
+function renderTabs(){
+  dayTabsEl.innerHTML = '';
+  DAYS.forEach(d=>{
+    const done = isClearedToday() && state.lastClearedDayKey === d.key;
+    const el = document.createElement('div');
+    el.className = 'day-tab' + (d.key===state.currentDay ? ' active':'') + (done ? ' done':'');
+    el.textContent = d.label;
+    el.onclick = ()=>{ state.currentDay = d.key; renderAll(); };
+    dayTabsEl.appendChild(el);
+  });
+}
+
+function renderQuest(){
+  const day = DAYS.find(d=>d.key===state.currentDay);
+  document.getElementById('instName').textContent = day.name;
+  document.getElementById('instRank').textContent = day.rank;
+  questListEl.innerHTML = '';
+  day.tasks.forEach((t,i)=>{
+    const checked = state.progress[day.key][i];
+    const row = document.createElement('div');
+    row.className = 'quest-item';
+    row.innerHTML = `
+      <div class="box ${checked?'checked':''}" data-i="${i}"></div>
+      <div class="q-text">
+        <div class="q-name ${checked?'checked':''}">${t[0]}</div>
+      </div>
+      <div class="q-reps">${t[1]}</div>
+    `;
+    row.querySelector('.box').onclick = ()=>{
+      state.progress[day.key][i] = !state.progress[day.key][i];
+      renderAll();
+    };
+    questListEl.appendChild(row);
+  });
+  const allDone = day.tasks.length>0 && day.tasks.every((_,i)=>state.progress[day.key][i]);
+  const blockedToday = isClearedToday();
+  completeBtn.className = 'complete-btn' + (allDone && !blockedToday ? ' ready':'');
+  completeBtn.textContent = blockedToday ? "TODAY'S QUEST CLEARED ✓" : 'COMPLETE QUEST';
+}
+
+function renderStatus(){
+  document.getElementById('lvNum').textContent = state.level;
+  document.getElementById('expFill').style.width = Math.min(100, (state.exp/state.expNeeded)*100) + '%';
+  document.getElementById('expText').textContent = `${state.exp} / ${state.expNeeded} EXP`;
+  ['str','vit','agi','end'].forEach(k=>{
+    document.getElementById('s-'+k).textContent = state.stats[k];
+    document.getElementById('b-'+k).style.width = Math.min(100, state.stats[k]) + '%';
+  });
+  document.getElementById('streakNum').textContent = state.streak;
+  const r = rankFor(state.level);
+  document.getElementById('rankBadge').textContent = r.letter;
+  document.getElementById('rankTitle').innerHTML = `STATUS: ACTIVE &nbsp;·&nbsp; TITLE: ${r.title}`;
+}
+
+function renderAll(){ renderTabs(); renderQuest(); renderStatus(); renderAchievements(); saveState(); }
+
+completeBtn.onclick = ()=>{
+  const day = DAYS.find(d=>d.key===state.currentDay);
+  const allDone = day.tasks.every((_,i)=>state.progress[day.key][i]);
+  if(!allDone || isClearedToday()) return;
+
+  const today = todayStr();
+  const lastDate = state.clearedDates.length ? state.clearedDates[state.clearedDates.length-1] : null;
+  if(lastDate){
+    const diffDays = Math.round((new Date(today) - new Date(lastDate)) / 86400000);
+    state.streak = diffDays === 1 ? state.streak + 1 : 1;
+  } else {
+    state.streak = 1;
+  }
+  state.clearedDates.push(today);
+  state.lastClearedDayKey = day.key;
+  state.totalCleared += 1;
+  if(day.key === 'sat') state.bossCleared += 1;
+  state.exp += 100;
+
+  const rankBefore = rankFor(state.level);
+  const gains = {str:2, vit:2, agi:1, end:1};
+  while(state.exp >= state.expNeeded){
+    state.exp -= state.expNeeded;
+    state.level += 1;
+    state.expNeeded = Math.round(state.expNeeded * 1.15);
+  }
+  state.stats.str += gains.str;
+  state.stats.vit += gains.vit;
+  state.stats.agi += gains.agi;
+  state.stats.end += gains.end;
+  const rankAfter = rankFor(state.level);
+  const newAchievements = checkAchievements();
+  state.history.push({ date: today, total: state.stats.str + state.stats.vit + state.stats.agi + state.stats.end, level: state.level });
+
+  // reset today's checklist so the routine can be repeated on its next scheduled day
+  state.progress[day.key] = day.tasks.map(()=>false);
+
+  renderAll();
+
+  if(rankAfter.letter !== rankBefore.letter){
+    playAwakening(rankAfter.letter, rankAfter.title, ()=>{
+      showLevelUp(gains);
+      queueToasts(newAchievements);
+    });
+  } else {
+    showLevelUp(gains);
+    queueToasts(newAchievements);
+  }
+};
+
+function showLevelUp(gains){
+  const el = document.getElementById('levelup');
+  document.querySelectorAll('.lu-stats div b')[0].textContent = '+'+gains.str;
+  document.querySelectorAll('.lu-stats div b')[1].textContent = '+'+gains.vit;
+  document.querySelectorAll('.lu-stats div b')[2].textContent = '+'+gains.agi;
+  document.querySelectorAll('.lu-stats div b')[3].textContent = '+'+gains.end;
+  document.querySelector('.lu-sub').textContent = 'QUEST CLEARED';
+  el.classList.add('show');
+  playLevelUpSound();
+}
+document.getElementById('luClose').onclick = ()=>{
+  document.getElementById('levelup').classList.remove('show');
+};
+
+const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const now0 = new Date();
+let calView = { year: now0.getFullYear(), month: now0.getMonth() };
+
+function renderCalendar(){
+  document.getElementById('calTotal').textContent = `${state.clearedDates.length} DAYS TRAINED`;
+  document.getElementById('calMonthLabel').textContent = `${MONTH_NAMES[calView.month]} ${calView.year}`;
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  const firstOfMonth = new Date(calView.year, calView.month, 1);
+  const leading = (firstOfMonth.getDay() + 6) % 7; // Monday-start offset
+  const daysInMonth = new Date(calView.year, calView.month + 1, 0).getDate();
+  const todayString = todayStr();
+
+  for(let i=0;i<leading;i++){
+    const cell = document.createElement('div');
+    cell.className = 'cal-day empty';
+    grid.appendChild(cell);
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${calView.year}-${String(calView.month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const cell = document.createElement('div');
+    let cls = 'cal-day';
+    if(state.clearedDates.includes(dateStr)) cls += ' trained';
+    if(dateStr === todayString) cls += ' today';
+    cell.className = cls;
+    cell.textContent = d;
+    grid.appendChild(cell);
+  }
+}
+
+document.getElementById('calBtn').onclick = ()=>{
+  calView = { year: now0.getFullYear(), month: now0.getMonth() };
+  renderCalendar();
+  document.getElementById('calendarModal').classList.add('show');
+};
+document.getElementById('calClose').onclick = ()=> document.getElementById('calendarModal').classList.remove('show');
+document.getElementById('calPrev').onclick = ()=>{
+  calView.month -= 1;
+  if(calView.month < 0){ calView.month = 11; calView.year -= 1; }
+  renderCalendar();
+};
+document.getElementById('calNext').onclick = ()=>{
+  calView.month += 1;
+  if(calView.month > 11){ calView.month = 0; calView.year += 1; }
+  renderCalendar();
+};
+
+function renderGrowthChart(){
+  const svg = document.getElementById('growthSvg');
+  const data = state.history;
+  const currentTotal = state.stats.str + state.stats.vit + state.stats.agi + state.stats.end;
+  document.getElementById('growthTotal').textContent = `POWER: ${currentTotal}`;
+
+  if(!data.length){
+    svg.innerHTML = `<text x="160" y="85" text-anchor="middle" fill="#5f7fa3" font-family="Share Tech Mono" font-size="11">ยังไม่มีข้อมูล — เคลียร์เควสแรกเพื่อเริ่มกราฟ</text>`;
+    return;
+  }
+  const W = 320, H = 170, padL = 30, padR = 10, padT = 14, padB = 20;
+  const values = data.map(h=>h.total);
+  const minV = Math.min(...values, 40), maxV = Math.max(...values, 40) + 5;
+  const stepX = data.length>1 ? (W-padL-padR)/(data.length-1) : 0;
+  const xFor = i => padL + i*stepX;
+  const yFor = v => padT + (H-padT-padB) * (1 - (v-minV)/(maxV-minV||1));
+
+  const linePts = data.map((h,i)=> `${xFor(i)},${yFor(h.total)}`).join(' ');
+  const areaPts = `${padL},${H-padB} ${linePts} ${xFor(data.length-1)},${H-padB}`;
+  const dots = data.map((h,i)=> `<circle cx="${xFor(i)}" cy="${yFor(h.total)}" r="2.5" fill="#4fe0ff"/>`).join('');
+  const gridLines = `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="#1c3a5e"/><line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#1c3a5e"/>`;
+
+  svg.innerHTML = `
+    ${gridLines}
+    <polygon points="${areaPts}" fill="rgba(79,224,255,0.12)"/>
+    <polyline points="${linePts}" fill="none" stroke="#4fe0ff" stroke-width="2"/>
+    ${dots}
+    <text x="${padL}" y="${H-4}" fill="#5f7fa3" font-family="Share Tech Mono" font-size="9">${data[0].date}</text>
+    <text x="${W-padR}" y="${H-4}" text-anchor="end" fill="#5f7fa3" font-family="Share Tech Mono" font-size="9">${data[data.length-1].date}</text>
+    <text x="${padL-4}" y="${padT+4}" text-anchor="end" fill="#5f7fa3" font-family="Share Tech Mono" font-size="9">${Math.round(maxV)}</text>
+    <text x="${padL-4}" y="${H-padB}" text-anchor="end" fill="#5f7fa3" font-family="Share Tech Mono" font-size="9">${Math.round(minV)}</text>
+  `;
+}
+
+document.getElementById('growthBtn').onclick = ()=>{
+  renderGrowthChart();
+  document.getElementById('growthModal').classList.add('show');
+};
+document.getElementById('growthClose').onclick = ()=> document.getElementById('growthModal').classList.remove('show');
+
+/* ---------- PWA INSTALL ---------- */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{ /* not served over http(s), ignore */ });
+  });
+}
+
+const installBtn = document.getElementById('installBtn');
+let deferredPrompt = null;
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+if(!isStandalone){
+  if(isIOS){
+    installBtn.style.display = 'inline-block';
+    installBtn.onclick = ()=> document.getElementById('iosInstallModal').classList.add('show');
+  } else {
+    window.addEventListener('beforeinstallprompt', (e)=>{
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'inline-block';
+    });
+    installBtn.onclick = async ()=>{
+      if(!deferredPrompt) return;
+      installBtn.style.display = 'none';
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+    };
+  }
+}
+window.addEventListener('appinstalled', ()=>{ installBtn.style.display = 'none'; });
+document.getElementById('iosInstallClose').onclick = ()=> document.getElementById('iosInstallModal').classList.remove('show');
+
+renderAll();
+setTimeout(()=>{ document.getElementById('intro').style.display='none'; }, 3500);
+</script>
+</body>
+</html>
